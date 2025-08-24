@@ -23,6 +23,21 @@ chmod +x run.sh
 cd backend && uv run uvicorn app:app --reload --port 8000
 ```
 
+### Code Quality Tools
+```bash
+# Format code with black and isort
+./scripts/format.sh
+
+# Run linting with flake8
+./scripts/lint.sh
+
+# Run type checking with mypy
+./scripts/typecheck.sh
+
+# Run all quality checks
+./scripts/quality.sh
+```
+
 ### Access Points
 - Web Interface: http://localhost:8000
 - API Documentation: http://localhost:8000/docs
@@ -117,7 +132,8 @@ The system uses **Anthropic's tool calling** where Claude autonomously decides w
 
 ### Development Notes
 
-- **No test framework** currently implemented
+- **Code Quality Tools** - Black (formatting), isort (imports), flake8 (linting), mypy (typing)
+- **Test Framework** - pytest with asyncio and mock support
 - **uv package manager** for Python dependency management
 - **FastAPI with auto-reload** for development
 - **Static file serving** with no-cache headers for development
