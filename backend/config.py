@@ -23,6 +23,9 @@ class Config:
     
     # Database paths
     CHROMA_PATH: str = "./chroma_db"  # ChromaDB storage location
+    
+    # Tool calling settings
+    MAX_TOOL_CALLS: int = 2  # Maximum tool calls per query in sequential mode
 
 config = Config()
 

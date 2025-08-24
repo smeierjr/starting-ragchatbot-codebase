@@ -4,7 +4,7 @@ from document_processor import DocumentProcessor
 from vector_store import VectorStore
 from ai_generator import AIGenerator
 from session_manager import SessionManager
-from search_tools import ToolManager, CourseSearchTool
+from search_tools import ToolManager, CourseSearchTool, CourseOutlineTool
 from models import Course, Lesson, CourseChunk
 
 class RAGSystem:
@@ -22,7 +22,9 @@ class RAGSystem:
         # Initialize search tools
         self.tool_manager = ToolManager()
         self.search_tool = CourseSearchTool(self.vector_store)
+        self.outline_tool = CourseOutlineTool(self.vector_store)
         self.tool_manager.register_tool(self.search_tool)
+        self.tool_manager.register_tool(self.outline_tool)
     
     def add_course_document(self, file_path: str) -> Tuple[Course, int]:
         """
@@ -118,19 +120,23 @@ class RAGSystem:
         if session_id:
             history = self.session_manager.get_conversation_history(session_id)
         
-        # Generate response using AI with tools
+        # Generate response using AI with tools (pass max tool calls from config)
         response = self.ai_generator.generate_response(
             query=prompt,
             conversation_history=history,
             tools=self.tool_manager.get_tool_definitions(),
-            tool_manager=self.tool_manager
+            tool_manager=self.tool_manager,
+            max_tool_calls=self.config.MAX_TOOL_CALLS
         )
         
-        # Get sources from the search tool
+        # Get sources from the search tool (includes accumulated sources from multi-round calling)
         sources = self.tool_manager.get_last_sources()
 
         # Reset sources after retrieving them
         self.tool_manager.reset_sources()
+        # Clear accumulated sources for next query
+        if hasattr(self.tool_manager, '_clear_accumulated_sources'):
+            self.tool_manager._clear_accumulated_sources()
         
         # Update conversation history
         if session_id:

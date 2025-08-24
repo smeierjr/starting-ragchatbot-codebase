@@ -142,3 +142,4 @@ The system uses **Anthropic's tool calling** where Claude autonomously decides w
 - `lesson_number` - Lesson number for filtering (optional)
 - `chunk_index` - Sequential chunk position in document
 - make sure to use uv to manage all dependencies.
+- don't run the server using ./run.sh.  I will do it myself
