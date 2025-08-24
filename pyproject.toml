@@ -19,4 +19,25 @@ dev = [
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
     "pytest-mock>=3.14.1",
+    "httpx>=0.24.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--disable-warnings",
+    "-p", "no:cacheprovider"
+]
+markers = [
+    "unit: Unit tests for individual components",
+    "integration: Integration tests for component interactions",
+    "api: API endpoint tests",
+    "slow: Tests that take longer to run",
+]
+asyncio_mode = "auto"

@@ -1,8 +1,10 @@
 import pytest
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock, MagicMock, patch
 import sys
 import os
 from typing import List, Dict, Any
+from fastapi.testclient import TestClient
+import tempfile
 
 # Add the backend directory to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -232,3 +234,174 @@ def assert_valid_tool_definition(tool_def: Dict[str, Any]):
     assert "type" in schema
     assert "properties" in schema
     assert "query" in schema["properties"]
+
+# API Testing Fixtures
+
+@pytest.fixture
+def mock_rag_system():
+    """Mock RAG system for API testing"""
+    mock_rag = Mock()
+    
+    # Default responses for API testing
+    mock_rag.query.return_value = ("This is a test response", [])
+    mock_rag.get_course_analytics.return_value = {
+        "total_courses": 2,
+        "course_titles": ["Introduction to MCP", "Advanced Python Programming"]
+    }
+    mock_rag.session_manager.create_session.return_value = "session_123"
+    
+    return mock_rag
+
+@pytest.fixture
+def test_app():
+    """Create FastAPI test app without static file mounting"""
+    from fastapi import FastAPI, HTTPException
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.middleware.trustedhost import TrustedHostMiddleware
+    from pydantic import BaseModel
+    from typing import List, Optional, Union, Dict, Any
+    
+    # Create test app (separate from main app to avoid static file issues)
+    app = FastAPI(title="Course Materials RAG System Test", root_path="")
+    
+    # Add middleware
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+    
+    # Pydantic models (same as in main app)
+    class QueryRequest(BaseModel):
+        query: str
+        session_id: Optional[str] = None
+    
+    class QueryResponse(BaseModel):
+        answer: str
+        sources: List[Union[str, Dict[str, Any]]]
+        session_id: str
+    
+    class CourseStats(BaseModel):
+        total_courses: int
+        course_titles: List[str]
+    
+    class NewSessionResponse(BaseModel):
+        session_id: str
+    
+    # Mock RAG system for dependency injection
+    mock_rag_system = None
+    
+    def get_rag_system():
+        return mock_rag_system
+    
+    # API endpoints (same logic as main app)
+    @app.post("/api/query", response_model=QueryResponse)
+    async def query_documents(request: QueryRequest):
+        try:
+            rag = get_rag_system()
+            session_id = request.session_id
+            if not session_id:
+                session_id = rag.session_manager.create_session()
+            
+            answer, sources = rag.query(request.query, session_id)
+            
+            return QueryResponse(
+                answer=answer,
+                sources=sources,
+                session_id=session_id
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @app.get("/api/courses", response_model=CourseStats)
+    async def get_course_stats():
+        try:
+            rag = get_rag_system()
+            analytics = rag.get_course_analytics()
+            return CourseStats(
+                total_courses=analytics["total_courses"],
+                course_titles=analytics["course_titles"]
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @app.post("/api/new-session", response_model=NewSessionResponse)
+    async def create_new_session():
+        try:
+            rag = get_rag_system()
+            session_id = rag.session_manager.create_session()
+            return NewSessionResponse(session_id=session_id)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    @app.get("/")
+    async def root():
+        return {"message": "Course Materials RAG System API"}
+    
+    # Store the dependency injection function for testing
+    app.dependency_overrides = {}
+    app._get_rag_system = get_rag_system
+    app._set_rag_system = lambda rag: setattr(app, '_rag_system_mock', rag) or globals().update({'mock_rag_system': rag})
+    
+    return app
+
+@pytest.fixture
+def test_client(test_app, mock_rag_system):
+    """Create test client with mocked dependencies"""
+    # Inject the mock RAG system
+    globals()['mock_rag_system'] = mock_rag_system
+    return TestClient(test_app)
+
+@pytest.fixture
+def sample_query_request():
+    """Sample query request for API testing"""
+    return {
+        "query": "What is MCP technology?",
+        "session_id": "test_session_123"
+    }
+
+@pytest.fixture
+def sample_query_response():
+    """Sample query response for API testing"""
+    return {
+        "answer": "MCP technology is a framework for building AI agents.",
+        "sources": [
+            {
+                "display_text": "Introduction to MCP - Lesson 0",
+                "link_url": "https://example.com/mcp/lesson0"
+            }
+        ],
+        "session_id": "test_session_123"
+    }
+
+@pytest.fixture
+def sample_course_stats():
+    """Sample course statistics for API testing"""
+    return {
+        "total_courses": 2,
+        "course_titles": ["Introduction to MCP", "Advanced Python Programming"]
+    }
+
+@pytest.fixture
+def mock_startup_documents():
+    """Mock for document startup loading"""
+    with patch('os.path.exists') as mock_exists:
+        mock_exists.return_value = False  # Disable startup document loading
+        yield mock_exists
+
+# Test data fixtures for various scenarios
+
+@pytest.fixture
+def api_error_scenarios():
+    """Common API error scenarios for testing"""
+    return {
+        "invalid_json": '{"query": invalid json}',
+        "missing_query": '{"session_id": "test"}',
+        "empty_query": '{"query": ""}',
+        "server_error": Exception("Internal server error"),
+        "rag_system_error": Exception("RAG system failed")
+    }
