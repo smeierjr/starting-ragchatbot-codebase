@@ -5,7 +5,7 @@ const API_URL = '/api';
 let currentSessionId = null;
 
 // DOM elements
-let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton;
+let chatMessages, chatInput, sendButton, totalCourses, courseTitles, newChatButton, themeToggle;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -16,8 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
     totalCourses = document.getElementById('totalCourses');
     courseTitles = document.getElementById('courseTitles');
     newChatButton = document.getElementById('newChatButton');
+    themeToggle = document.getElementById('themeToggle');
     
     setupEventListeners();
+    initializeTheme();
     createNewSession();
     loadCourseStats();
 });
@@ -32,6 +34,16 @@ function setupEventListeners() {
 
     // New chat functionality
     newChatButton.addEventListener('click', startNewChat);
+    
+    // Theme toggle functionality
+    themeToggle.addEventListener('click', toggleTheme);
+    themeToggle.addEventListener('keydown', (e) => {
+        // Handle Enter and Space keys for accessibility
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleTheme();
+        }
+    });
     
     
     // Suggested questions
@@ -246,5 +258,53 @@ async function loadCourseStats() {
         if (courseTitles) {
             courseTitles.innerHTML = '<span class="error">Failed to load courses</span>';
         }
+    }
+}
+
+// Theme Functions
+function initializeTheme() {
+    // Check for saved theme preference or default to 'dark'
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeToggleState(savedTheme);
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    
+    // Add smooth transition class to body for enhanced animation
+    document.body.style.transition = 'all 0.3s ease';
+    
+    // Update theme with smooth transition
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    updateThemeToggleState(newTheme);
+    
+    // Enhanced visual feedback with rotation and scale animation
+    themeToggle.style.transform = 'scale(0.9) rotate(180deg)';
+    themeToggle.style.transition = 'transform 0.3s ease';
+    
+    setTimeout(() => {
+        themeToggle.style.transform = 'scale(1) rotate(0deg)';
+    }, 150);
+    
+    // Clean up transition styles after animation
+    setTimeout(() => {
+        themeToggle.style.transition = '';
+        document.body.style.transition = '';
+    }, 300);
+}
+
+function updateThemeToggleState(theme) {
+    const sunIcon = themeToggle.querySelector('.sun-icon');
+    const moonIcon = themeToggle.querySelector('.moon-icon');
+    
+    if (theme === 'light') {
+        themeToggle.setAttribute('aria-label', 'Switch to dark theme');
+        themeToggle.setAttribute('title', 'Switch to dark theme');
+    } else {
+        themeToggle.setAttribute('aria-label', 'Switch to light theme');
+        themeToggle.setAttribute('title', 'Switch to light theme');
     }
 }
